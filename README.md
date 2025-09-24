@@ -1,6 +1,6 @@
 # QR Menu Pro (Cloudinary + Firestore)
 
-.
+. 
   
 ## ✨ المزايا
 - رفع الصور باستخدام Cloudinary بدل Firebase Storage.
