@@ -2,14 +2,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { db } from '@/lib/firebase'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 
 type Cat = {
   id: string
   name?: string
   nameAr?: string
   nameEn?: string
-  imageUrl?: string
   order?: number
 }
 type Item = {
@@ -19,39 +18,54 @@ type Item = {
   nameAr?: string
   nameEn?: string
   price?: number
-  imageUrl?: string
 }
 
 export default function RestaurantPublicPage() {
-  const params = useParams() as { restaurantId?: string } |null
-  const rid = params?.restaurantId??''
+  const params = useParams() as { restaurantId?: string } | null
+  const rid = params?.restaurantId ?? ''
 
   const [cats, setCats] = useState<Cat[]>([])
   const [items, setItems] = useState<Item[]>([])
-  const [selectedCat, setSelectedCat] = useState<string | null>(null)
+  const [bgUrl, setBgUrl] = useState<string>('')
+
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
 
   const labelCat = (c: Cat) =>
-    (lang === 'ar' ? (c.nameAr || c.name) : (c.nameEn || c.name)) || 'بدون اسم'
+    (lang === 'ar' ? (c.nameAr||c.name) : (c.nameEn||c.name)) || 'بدون اسم'
   const labelItem = (i: Item) =>
-    (lang === 'ar' ? (i.nameAr || i.name) : (i.nameEn || i.name)) || 'بدون اسم'
+    (lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
 
   useEffect(() => {
     async function load() {
+      if (!rid) return
+      // تحميل بيانات المطعم (الشعار + الخلفية)
+      const ref = doc(db, 'restaurants', rid)
+      const snap = await getDoc(ref)
+      if (snap.exists()) {
+        const data = snap.data() as any
+        setBgUrl(data.bgUrl ?? '')
+      }
+
+      // تحميل المجموعات
       const qc = query(collection(db, 'restaurants', rid, 'categories'), orderBy('order', 'asc'))
       const qi = collection(db, 'restaurants', rid, 'items')
       const [cs, is] = await Promise.all([getDocs(qc), getDocs(qi)])
       setCats(cs.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
       setItems(is.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
     }
-    if (rid) { load() }
+    load()
   }, [rid])
 
-  const filtered = selectedCat ? items.filter(i => i.catId === selectedCat) : []
-
   return (
-    <main className="container mx-auto p-6">
-      <header className="flex items-center justify-between mb-6">
+    <main
+      className="min-h-screen p-6 text-white"
+      style={{
+        backgroundImage: bgUrl ? `url(${bgUrl}) `: undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <header className="flex items-center justify-between mb-6 bg-black/50 p-3 rounded">
         <h1 className="text-2xl font-bold">القائمة</h1>
         <div className="flex gap-2">
           <button
@@ -69,57 +83,20 @@ export default function RestaurantPublicPage() {
         </div>
       </header>
 
-      {!selectedCat && (
-        <>
-          <h2 className="font-bold mb-3">المجموعات</h2>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {cats.map(c => (
-              <button
-                key={c.id}
-                className="card overflow-hidden text-left"
-                onClick={() => setSelectedCat(c.id)}
-                title="افتح المجموعة"
-              >
-                <div className="relative h-36 w-full bg-white/5">
-                  {c.imageUrl ? (
-                    <img src={c.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-white/40">لا توجد صورة</div>
-                  )}
-                </div>
-                <div className="p-4 font-semibold">{labelCat(c)}</div>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {selectedCat && (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <button className="btn-ghost" onClick={() => setSelectedCat(null)}>← رجوع للمجموعات</button>
-            <div className="text-white/70">
-              {labelCat(cats.find(c => c.id === selectedCat) || ({} as any))}
-            </div>
-          </div>
-
+      {cats.map(cat => (
+        <section key={cat.id} className="mb-8 bg-black/40 p-4 rounded">
+          <h2 className="font-bold text-xl mb-3">{labelCat(cat)}</h2>
           <ul className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {filtered.map(it => (
-              <li key={it.id} className="card p-4">
-                <div className="relative h-32 mb-3 bg-white/5 rounded">
-                  {it.imageUrl ? (
-                    <img src={it.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover rounded" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-white/40">بدون صورة</div>
-                  )}
-                </div>
+            {items.filter(i => i.catId === cat.id).map(it => (
+              <li key={it.id} className="card p-4 bg-black/50">
+                {/* حذف صورة الصنف */}
                 <div className="font-semibold">{labelItem(it)}</div>
-                <div className="text-white/60">{(it.price ?? 0).toString().padStart(3, '0')}</div>
+                <div className="text-white/70">{(it.price ?? 0).toString().padStart(3, '0')}</div>
               </li>
             ))}
           </ul>
-        </>
-      )}
+        </section>
+      ))}
     </main>
   )
 }
