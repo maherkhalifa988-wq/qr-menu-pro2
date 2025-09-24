@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ألوان وخلفية عامة */
+:root{
+  --bg:#0b0b0c;
+  --card:#141417;
+  --accent:#a8ff78;
+  --accent2:#78ffd6;
+}
+
+body{
+  background:
+    radial-gradient(1000px 600px at 10% 10%, rgba(168,255,120,.08), transparent 60%),
+    radial-gradient(800px 500px at 90% 20%, rgba(120,255,214,.08), transparent 60%),
+    #0b0b0c;
+  color:#fff;
+}
+
+/* بطاقات موحدة */
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:1.25rem;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+
+/* أزرار */
+.btn{
+  padding:.5rem 1rem;
+  border-radius:.75rem;
+  font-weight:700;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  color:#0b0b0c;
+}
+
+.btn-ghost{
+  padding:.5rem 1rem;
+  border-radius:.75rem;
+  font-weight:700;
+  background:rgba(255,255,255,.1);
+}
+
+/* مدخلات */
+.input{
+  width:100%;
+  padding:.5rem .75rem;
+  border-radius:.75rem;
+  background:#1a1a1f;
+  border:1px solid rgba(255,255,255,.1);
+  outline:none;
+}
+
+/* تسميات الحقول */
+.label{
+  display:block;
+  font-size:.875rem;
+  color:rgba(255,255,255,.7);
+  margin-bottom:.25rem;
+}
