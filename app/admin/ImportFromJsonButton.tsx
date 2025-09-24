@@ -46,6 +46,10 @@ export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: str
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    // داخل handleFile
+const [oldCats, oldItems] = await Promise.all([getDocs(catsCol), getDocs(itemsCol)])
+await Promise.all(oldItems.docs.map(d => deleteDoc(d.ref)))
+await Promise.all(oldCats.docs.map(d => deleteDoc(d.ref)))
     const file = e.target.files?.[0]
     if (!file) return
 
