@@ -1,132 +1,196 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { db } from '@/lib/firebase'
-import {
-  doc, setDoc, collection, addDoc, deleteDoc, getDocs,
-} from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 
-type SeedRestaurant = {
+type Cat = {
+  id: string
   name?: string
-  logoUrl?: string
-  bgUrl?: string
-  categories?: Array<{
-    id?: string
-    name?: string
-    nameAr?: string
-    nameEn?: string
-    order?: number
-    imageUrl?: string
-  }>
-  items?: Array<{
-    id?: string
-    catId: string
-    name?: string
-    nameAr?: string
-    nameEn?: string
-    price?: number
-    imageUrl?: string
-    order?: number
-  }>
+  nameAr?: string
+  nameEn?: string
+  imageUrl?: string
+  order?: number
+}
+type Item = {
+  id: string
+  catId: string
+  name?: string
+  nameAr?: string
+  nameEn?: string
+  price?: number
 }
 
-export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: string }) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const [busy, setBusy] = useState(false)
+export default function RestaurantPublicPage() {
+  const params = useParams() as { restaurantId?: string } | null
+  const rid = params?.restaurantId ?? ''
 
-  function openPicker() {
-    inputRef.current?.click()
-  }
+  const [loading, setLoading] = useState(true)
+  const [name, setName] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | undefined>()
+  const [bgUrl, setBgUrl] = useState<string | undefined>()
+  const [cats, setCats] = useState<Cat[]>([])
+  const [items, setItems] = useState<Item[]>([])
+  const [selectedCat, setSelectedCat] = useState<string | null>(null)
+  const [lang, setLang] = useState<'ar' | 'en'>('ar')
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const labelCat = (c: Cat) =>
+    (lang === 'ar' ? (c.nameAr||c.name) : (c.nameEn||c.name)) || 'بدون اسم'
+  const labelItem = (i: Item) =>
+    (lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
 
-    setBusy(true)
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text) as SeedRestaurant
+  useEffect(() => {
+    let mounted = true
+    if (!rid) return
+    ;(async () => {
+      try {
+        // المطعم
+        const rref = doc(db, 'restaurants', rid)
+        const rsnap = await getDoc(rref)
+        if (!mounted) return
+        if (rsnap.exists()) {
+          const r = rsnap.data() as any
+          setName(r?.name ?? '')
+          setLogoUrl(r?.logoUrl)
+          setBgUrl(r?.bgUrl)
+        }
 
-      // 1) تحديث مستند المطعم
-      await setDoc(
-        doc(db, 'restaurants', rid),
-        {
-          name: data.name ?? 'مطعم النخيل',
-          logoUrl: data.logoUrl ?? '',
-          bgUrl: data.bgUrl ?? '',
-          updatedAt: Date.now(),
-        },
-        { merge: true },
-      )
+        // المجموعات (مرتبة)
+        const qc = query(collection(db, 'restaurants', rid, 'categories'), orderBy('order', 'asc'))
+        const cs = await getDocs(qc)
+        if (!mounted) return
+        const catsData = cs.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
+        setCats(catsData)
 
-      // 2) مراجع المجموعات/الأصناف (عرّفها قبل استخدامها)
-      const catsCol = collection(db, 'restaurants', rid, 'categories')
-      const itemsCol = collection(db, 'restaurants', rid, 'items')
-
-      // 3) تفريغ القديم
-      const [oldCats, oldItems] = await Promise.all([
-        getDocs(catsCol),
-        getDocs(itemsCol),
-      ])
-      await Promise.all(oldItems.docs.map((d) => deleteDoc(d.ref)))
-      await Promise.all(oldCats.docs.map((d) => deleteDoc(d.ref)))
-
-      // 4) إضافة المجموعات
-      const createdCats = new Map<string, string>()
-      for (const c of data.categories ?? []) {
-        const ref = await addDoc(catsCol, {
-          name: c.name ?? c.nameAr ?? c.nameEn ?? '',
-          nameAr: c.nameAr ?? '',
-          nameEn: c.nameEn ?? '',
-          imageUrl: c.imageUrl ?? '',
-          order: c.order ?? 0,
-          createdAt: Date.now(),
+        // الأصناف (تطبيع catId مهما كان اسمه في الداتا)
+        const qi = collection(db, 'restaurants', rid, 'items')
+        const is = await getDocs(qi)
+        if (!mounted) return
+        const itemsData = is.docs.map(d => {
+          const raw: any = d.data() || {}
+          const normalizedCatId =
+            raw.catId ?? raw.categoryId ?? raw.catid ?? raw.category ?? ''
+          return {
+            id: d.id,
+            ...raw,
+            catId: String(normalizedCatId || ''), // نضمن أنها سترينغ
+          } as Item
         })
-        if (c.id) createdCats.set(c.id, ref.id)
-      }
+        setItems(itemsData)
 
-      // 5) إضافة الأصناف
-      for (const it of data.items ?? []) {
-        const catId = createdCats.get(it.catId) ?? it.catId
-        await addDoc(itemsCol, {
-          catId,
-          name: it.name ?? it.nameAr ?? it.nameEn ?? '',
-          nameAr: it.nameAr ?? '',
-          nameEn: it.nameEn ?? '',
-          price: Number(it.price ?? 0),
-          imageUrl: it.imageUrl ?? '',
-          order: it.order ?? 0,
-          createdAt: Date.now(),
-        })
+        // إن لم تُحدَّد مجموعة بعد، اختر أول مجموعة موجودة
+        if (!selectedCat && catsData.length > 0) {
+          setSelectedCat(catsData[0].id)
+        }
+      } finally {
+        if (mounted) setLoading(false)
       }
-
-      alert('تم استيراد القائمة بنجاح ✅')
-      e.target.value = '' // إعادة ضبط اختيار الملف
-    } catch (err: any) {
-      console.error(err)
-      alert('فشل الاستيراد: ' + (err?.message || ''))
-    } finally {
-      setBusy(false)
+    })()
+    return () => {
+      mounted = false
     }
-  }
+  }, [rid]) // لا تضف selectedCat هنا
+
+  const filtered = useMemo(
+    () => (selectedCat ? items.filter(i => i.catId === selectedCat) : []),
+    [items, selectedCat]
+  )
+
+  if (loading) return <main className="container mx-auto p-6">...جارٍ التحميل</main>
 
   return (
-    <div className="card p-5">
-      <h3 className="font-bold mb-2">استيراد القائمة من JSON</h3>
-      <p className="text-white/60 mb-3">
-        اختر ملف JSON فيه اسم المطعم والمجموعات والأصناف. سيتم استبدال البيانات القديمة.
-      </p>
-      <div className="flex items-center gap-3">
-        <button className="btn" onClick={openPicker} disabled={busy}>
-          {busy ? 'جارِ الاستيراد…' : 'رفع ملف JSON'}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/json"
-          onChange={handleFile}
-          hidden
-        />
+    <main className="container mx-auto p-6">
+      {/* الهيدر مع الخلفية */}
+      <div className="relative mb-6">
+        {bgUrl ? (
+          <img
+            src={bgUrl}
+            alt=""
+            className="absolute inset-0 h-60 w-full object-cover rounded-xl pointer-events-none"
+          />
+        ) : null}
+        <div className="relative z-10 h-60 flex items-end justify-between p-4">
+          <div className="text-right">
+            <h1 className="text-2xl font-bold">{name || 'القائمة'}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className={'btn-ghost ' + (lang === 'ar' ? 'ring-2 ring-white/30' : '')}
+              onClick={() => setLang('ar')}
+            >
+              عربي
+            </button>
+            <button
+              className={'btn-ghost ' + (lang === 'en' ? 'ring-2 ring-white/30' : '')}
+              onClick={() => setLang('en')}
+            >
+              EN
+            </button>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="h-12 w-auto rounded-lg border border-white/10 bg-white/10 backdrop-blur"
+              />
+            ) : null}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {!selectedCat && (
+        <>
+          <h2 className="font-bold mb-3">المجموعات</h2>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {cats.map(c => (
+              <button
+                key={c.id}
+                className="card overflow-hidden text-left"
+                onClick={() => setSelectedCat(c.id)}
+                title="افتح المجموعة"
+              >
+                <div className="relative h-36 w-full bg-white/5">
+                  {c.imageUrl ? (
+                    <img src={c.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-white/40">
+                      لا توجد صورة
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 font-semibold">{labelCat(c)}</div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {selectedCat && (
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <button className="btn-ghost" onClick={() => setSelectedCat(null)}>
+              ← رجوع للمجموعات
+            </button>
+            <div className="text-white/70">
+              {labelCat(cats.find(c => c.id === selectedCat) || ({} as any))}
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="text-white/60">لا توجد أصناف في هذه المجموعة</div>
+          ) : (
+            <ul className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {filtered.map(it => (
+                <li key={it.id} className="card p-4">
+                  <div className="font-semibold">{labelItem(it)}</div>
+                  <div className="text-white/60">
+                    {(it.price ?? 0).toString().padStart(3, '0')}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </main>
   )
 }
