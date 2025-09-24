@@ -29,8 +29,8 @@ export default function MigrateItemsPage() {
   async function checkNested() {
     const cg = collectionGroup(db, 'items')
     const all = await getDocs(cg)
-    const mine = all.docs.filter(d => d.ref.path.includes(/restaurants/${RID}/categories/))
-    push(عناصر متداخلة تخص ${RID}: ${mine.length})
+    const mine = all.docs.filter(d => d.ref.path.includes(`/restaurants/${RID}/categories/`))
+    push(`عناصر متداخلة تخص ${RID}: ${mine.length}`)
   }
 
   return (
