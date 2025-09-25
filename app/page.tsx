@@ -22,7 +22,6 @@ export default function Home() {
       alert(`فشل الدخول: ${err?.message ?? err}`)
     }
   }
-
   return (
     <main className="container mx-auto p-6">
       <header className="mb-8 text-center">
