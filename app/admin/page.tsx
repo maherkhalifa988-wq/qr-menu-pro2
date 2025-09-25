@@ -1,326 +1,271 @@
-// app/admin/page.tsx
-'use client'
+// app/admin/menu/page.tsx
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
-import Image from 'next/image'
-import {
-  collection,
-  getDocs,
-  orderBy,
-  query,
-  doc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-} from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import AdminBrandSection from './AdminBrandSection'
-import ImportFromJsonButton from './ImportFromJsonButton'
-import uploadImage from '@/lib/uploadImage'
+import React, { useEffect, useMemo, useState } from "react";
 
-const RID = 'al-nakheel'
+type Group = {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  imageUrl?: string | null;
+};
 
-type Cat = {
-  id: string
-  name?: string
-  nameAr?: string
-  nameEn?: string
-  imageUrl?: string
-  order?: number
-}
 type Item = {
-  id: string
-  name?: string
-  nameAr?: string
-  nameEn?: string
-  price?: number
-  imageUrl?: string
-  order?: number
+  id: string;
+  groupId: string;
+  nameAr: string;
+  nameEn: string;
+  imageUrl?: string | null;
+  price?: number | null;
+  isActive?: boolean;
+};
+
+declare global {
+  interface Window {
+    cloudinary?: any;
+  }
 }
 
-export default function AdminPage() {
-  const [name, setName] = useState('')
-  const [logoUrl, setLogoUrl] = useState<string | undefined>()
-  const [bgUrl, setBgUrl] = useState<string | undefined>()
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET;
 
-  const [loadingCats, setLoadingCats] = useState(true)
-  const [cats, setCats] = useState<Cat[]>([])
-  const [selectedCat, setSelectedCat] = useState<string | null>(null)
+export default function AdminMenuPage() {
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loadingItems, setLoadingItems] = useState(false)
-  const [items, setItems] = useState<Item[]>([])
-  const [saving, setSaving] = useState(false)
-
-  // تحميل المجموعات
+  // === Load data from your API ===
   useEffect(() => {
-    let alive = true
-    ;(async () => {
+    let mounted = true;
+    (async () => {
       try {
-        setLoadingCats(true)
-        const qc = query(
-          collection(db, 'restaurants', RID, 'categories'),
-          orderBy('order', 'asc')
-        )
-        const snap = await getDocs(qc)
-        if (!alive) return
-        setCats(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+        setLoading(true);
+        const [gRes, iRes] = await Promise.all([
+          fetch("/api/groups", { cache: "no-store" }),
+          fetch("/api/items", { cache: "no-store" }),
+        ]);
+
+        if (!gRes.ok) throw new Error("Failed to fetch groups");
+        if (!iRes.ok) throw new Error("Failed to fetch items");
+
+        const gData: Group[] = await gRes.json();
+        const iData: Item[] = await iRes.json();
+
+        if (!mounted) return;
+        setGroups(gData);
+        setItems(iData);
+        setSelectedGroupId((prev) => prev ?? gData[0]?.id ?? null);
+        setError(null);
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message || "حدث خطأ أثناء جلب البيانات");
       } finally {
-        if (alive) setLoadingCats(false)
+        if (mounted) setLoading(false);
       }
-    })()
-    return () => { alive = false }
-  }, [])
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  // أصناف المجموعة المختارة
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      if (!selectedCat) { setItems([]); return }
-      setLoadingItems(true)
-      try {
-        const col = collection(db, 'restaurants', RID, 'categories', selectedCat, 'items')
-        const snap = await getDocs(col)
-        if (!alive) return
-        setItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
-      } finally {
-        if (alive) setLoadingItems(false)
-      }
-    })()
-    return () => { alive = false }
-  }, [selectedCat])
+  // Items of selected group
+  const filteredItems = useMemo(
+    () => (selectedGroupId ? items.filter((it) => it.groupId === selectedGroupId) : []),
+    [items, selectedGroupId]
+  );
 
-  const currentCat = useMemo(
-    () => cats.find(c => c.id === selectedCat) || null,
-    [cats, selectedCat]
-  )
-
-  async function saveCat(c: Cat) {
-    setSaving(true)
-    try {
-      await updateDoc(doc(db, 'restaurants', RID, 'categories', c.id), {
-        name: c.name ?? c.nameAr ?? c.nameEn ?? '',
-        nameAr: c.nameAr ?? '',
-        nameEn: c.nameEn ?? '',
-        imageUrl: c.imageUrl ?? '',
-        order: typeof c.order === 'number' ? c.order : 0,
-      })
-      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, ...c } : x)))
-      alert('تم حفظ بيانات المجموعة')
-    } catch (e: any) {
-      console.error(e); alert('فشل حفظ المجموعة: ' + (e?.message || ''))
-    } finally { setSaving(false) }
-  }
-
-  async function deleteCat(catId: string) {
-    if (!confirm('سيتم حذف المجموعة وجميع أصنافها. هل أنت متأكد؟')) return
-    setSaving(true)
-    try {
-      const itemsCol = collection(db, 'restaurants', RID, 'categories', catId, 'items')
-      const itemsSnap = await getDocs(itemsCol)
-      const batch = writeBatch(db)
-      itemsSnap.forEach(d => batch.delete(d.ref))
-      batch.delete(doc(db, 'restaurants', RID, 'categories', catId))
-      await batch.commit()
-      setCats(prev => prev.filter(c => c.id !== catId))
-      if (selectedCat === catId) { setSelectedCat(null); setItems([]) }
-      alert('تم الحذف')
-    } catch (e: any) {
-      console.error(e); alert('فشل الحذف: ' + (e?.message || ''))
-    } finally { setSaving(false) }
-  }
-
-  async function saveItemPrice(itemId: string, newPrice: number) {
-    if (!selectedCat) return
-    setSaving(true)
-    try {
-      await updateDoc(
-        doc(db, 'restaurants', RID, 'categories', selectedCat, 'items', itemId),
-        { price: Number(newPrice || 0) }
-      )
-      setItems(prev => prev.map(it => (it.id === itemId ? { ...it, price: newPrice } : it)))
-    } catch (e: any) {
-      console.error(e); alert('فشل حفظ السعر: ' + (e?.message || ''))
-    } finally { setSaving(false) }
-  }
-
-  // رفع صورة للمجموعة
-  async function handleUploadCatImage(file: File, catId: string) {
-    try {
-      const url = await uploadImage(file, 'categories')
-      setCats(prev => prev.map(c => (c.id === catId ? { ...c, imageUrl: url } : c)))
-    } catch (e: any) {
-      alert('فشل رفع الصورة: ' + (e?.message || e))
+  // === Cloudinary Upload helper ===
+  const openCloudinary = (onSuccess: (url: string) => void) => {
+    if (!window.cloudinary) {
+      alert("Cloudinary Widget غير متوفر. تأكد من تضمين سكربت الويدجت في _app أو layout.");
+      return;
     }
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName: CLOUDINARY_CLOUD_NAME,
+        uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+        multiple: false,
+        sources: ["local", "url", "camera"],
+        folder: "menu",
+        maxFiles: 1,
+      },
+      (error: any, result: any) => {
+        if (!error && result && result.event === "success") {
+          onSuccess(result.info.secure_url);
+        }
+      }
+    );
+    widget.open();
+  };
+
+  // === Mutations ===
+  const updateGroupImage = async (groupId: string, imageUrl: string) => {
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/groups/${groupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl }),
+      });
+      if (!res.ok) throw new Error("فشل حفظ صورة المجموعة");
+      setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, imageUrl } : g)));
+    } catch (e: any) {
+      alert(e?.message || "تعذر حفظ الصورة");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateItemImage = async (itemId: string, imageUrl: string) => {
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl }),
+      });
+      if (!res.ok) throw new Error("فشل حفظ صورة الصنف");
+      setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, imageUrl } : it)));
+    } catch (e: any) {
+      alert(e?.message || "تعذر حفظ الصورة");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // === UI ===
+  if (loading) {
+    return (
+      <main className="container mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-6">لوحة الإدارة</h1>
+        <p>جاري التحميل...</p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="container mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-6">لوحة الإدارة</h1>
+        <p className="text-red-500">{error}</p>
+      </main>
+    );
   }
 
   return (
     <main className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">لوحة الإدارة</h1>
+      <h1 className="text-2xl font-bold mb-6">إدارة المجموعات والأصناف</h1>
 
-      {/* 1) الهوية */}
-      <AdminBrandSection
-        rid={RID}
-        name={name}
-        setName={setName}
-        logoUrl={logoUrl}
-        setLogoUrl={setLogoUrl}
-        bgUrl={bgUrl}
-        setBgUrl={setBgUrl}
-      />
-
-      {/* 2) استيراد JSON */}
-      <section className="my-6">
-        <ImportFromJsonButton rid={RID} />
-      </section>
-
-      {/* 3) إدارة المجموعات */}
-      <section className="card p-5 my-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold">إدارة المجموعات</h2>
-          {loadingCats && <span className="text-white/60 text-sm">...جارٍ التحميل</span>}
+      {/* === BAR 1: المجموعات === */}
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold">المجموعات</h2>
+          <div className="text-sm opacity-70">{saving ? "يتم الحفظ..." : null}</div>
         </div>
 
-        {cats.length === 0 && !loadingCats ? (
-          <p className="text-white/60">لا توجد مجموعات بعد.</p>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            {cats.map((c) => (
-              <div key={c.id} className="card p-4">
-                <div className="flex items-center justify-between">
-                  <b>#{c.order ?? 0}</b>
-                  <div className="flex gap-2">
-                    <button className="btn-ghost" onClick={() => setSelectedCat(c.id)}>
-                      أصناف المجموعة
-                    </button>
-                    <button
-                      className="btn-ghost text-red-300"
-                      onClick={() => deleteCat(c.id)}
-                      disabled={saving}
-                      title="حذف المجموعة مع كافة الأصناف"
-                    >
-                      حذف
-                    </button>
-                  </div>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {groups.map((g) => {
+            const isActive = g.id === selectedGroupId;
+            return (
+              <div
+                key={g.id}
+                className={`flex items-center gap-3 whitespace-nowrap rounded-2xl border px-3 py-2 cursor-pointer transition
+                  ${isActive ? "bg-emerald-600 text-white border-emerald-600" : "bg-white/5 border-white/20 hover:bg-white/10"}`}
+                onClick={() => setSelectedGroupId(g.id)}
+                title={g.nameAr}
+              >
+                <div className="w-9 h-9 rounded-xl overflow-hidden border">
+                  {g.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={g.imageUrl} alt={g.nameAr} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-xs opacity-60">لا صورة</div>
+                  )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <label className="text-sm">الاسم (عربي)</label>
-                  <input
-                    className="input"
-                    value={c.nameAr ?? ''}
-                    onChange={(e) =>
-                      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, nameAr: e.target.value } : x)))
-                    }
-                  />
-                  <label className="text-sm">Name (English)</label>
-                  <input
-                    className="input"
-                    value={c.nameEn ?? ''}
-                    onChange={(e) =>
-                      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, nameEn: e.target.value } : x)))
-                    }
-                  />
-
-                  {/* زر رفع صورة */}
-                  <label className="text-sm">صورة المجموعة</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0]
-                        if (f) handleUploadCatImage(f, c.id)
-                      }}
-                    />
-                    {c.imageUrl && (
-                      <Image
-                        src={c.imageUrl}
-                        alt="صورة المجموعة"
-                        width={80}
-                        height={60}
-                        className="rounded border border-white/10 object-cover"
-                      />
-                    )}
-                  </div>
-
-                  <label className="text-sm">الترتيب</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={c.order ?? 0}
-                    onChange={(e) =>
-                      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, order: Number(e.target.value || 0) } : x)))
-                    }
-                  />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold">{g.nameAr}</span>
+                  <span className="text-[10px] opacity-70">{g.nameEn}</span>
                 </div>
-
-                <div className="mt-3">
-                  <button
-                    className="btn"
-                    onClick={() => saveCat(c)}
-                    disabled={saving}
-                  >
-                    حفظ المجموعة
-                  </button>
-                </div>
+                <button
+                  className={`ml-1 text-xs rounded-lg px-2 py-1 border ${isActive ? "border-white/60" : "border-white/20"}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCloudinary((url) => updateGroupImage(g.id, url));
+                  }}
+                >
+                  رفع صورة
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 4) محرر أسعار الأصناف */}
-      <section className="card p-5 my-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold">تعديل أسعار الأصناف</h2>
-          <select
-            className="input"
-            value={selectedCat ?? ''}
-            onChange={(e) => setSelectedCat(e.target.value || null)}
-          >
-            <option value="">— اختر مجموعة —</option>
-            {cats.map(c => (
-              <option key={c.id} value={c.id}>{c.nameAr || c.name || c.nameEn || c.id}</option>
-            ))}
-          </select>
+            );
+          })}
         </div>
-
-        {!selectedCat ? (
-          <p className="text-white/60">اختر مجموعة لعرض أصنافها.</p>
-        ) : loadingItems ? (
-          <p className="text-white/60">...جارٍ تحميل الأصناف</p>
-        ) : items.length === 0 ? (
-          <p className="text-white/60">لا توجد أصناف داخل هذه المجموعة.</p>
-        ) : (
-          <table className="w-full border border-white/10">
-            <thead>
-              <tr className="bg-white/5">
-                <th className="p-2 text-right">الاسم (عربي)</th>
-                <th className="p-2 text-right">Name (English)</th>
-                <th className="p-2 text-right">السعر</th>
-                <th className="p-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(it => (
-                <tr key={it.id} className="border-t border-white/10">
-                  <td className="p-2">{it.nameAr || it.name || '-'}</td>
-                  <td className="p-2">{it.nameEn || '-'}</td>
-                  <td className="p-2">
-                    <input
-                      type="number"
-                      className="input w-32"
-                      defaultValue={typeof it.price === 'number' ? it.price : 0}
-                      onBlur={(e) => saveItemPrice(it.id, Number(e.target.value || 0))}
-                    />
-                  </td>
-                  <td className="p-2 text-white/50 text-xs">يحفظ عند الخروج من الحقل</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </section>
+
+      {/* === BAR 2: الأصناف التابعة للمجموعة المختارة (اختياري كفلتر سريع) === */}
+      <section className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold">أصناف المجموعة المختارة</h3>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {filteredItems.map((it) => (
+            <span
+              key={it.id}
+              className="text-xs border rounded-xl px-2 py-1 bg-white/5 border-white/20 whitespace-nowrap"
+              title={it.nameAr}
+            >
+              {it.nameAr}
+            </span>
+          ))}
+          {filteredItems.length === 0 && (
+            <span className="text-sm opacity-60">لا توجد أصناف لعرضها في هذه المجموعة.</span>
+          )}
+        </div>
+      </section>
+
+      {/* === GRID: عرض الأصناف الخاصة بالمجموعة المختارة فقط === */}
+      <section>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredItems.map((it) => (
+            <div key={it.id} className="border rounded-2xl p-3 bg-white/5 border-white/20">
+              <div className="aspect-[4/3] w-full rounded-xl overflow-hidden border mb-3">
+                {it.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={it.imageUrl} alt={it.nameAr} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full grid place-items-center text-sm opacity-60">لا صورة</div>
+                )}
+              </div>
+
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold">{it.nameAr}</div>
+                  <div className="text-xs opacity-70">{it.nameEn}</div>
+                  {typeof it.price === "number" && (
+                    <div className="mt-1 text-sm">السعر: {it.price.toFixed(2)}</div>
+                  )}
+                </div>
+                <button
+                  className="text-xs rounded-lg px-2 py-1 border border-white/20 hover:bg-white/10"
+                  onClick={() => openCloudinary((url) => updateItemImage(it.id, url))}
+                >
+                  تغيير الصورة
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Hint for Cloudinary script */}
+      <footer className="mt-8 text-xs opacity-60">
+        تأكد من إضافة سكربت Cloudinary Widget في <code>app/(root)/layout.tsx</code> أو <code>_app.tsx</code>:
+        <pre className="mt-2 p-2 rounded bg-black/40 overflow-auto">
+{`<script src="https://widget.cloudinary.com/v2.0/global/all.js" async></script>`}
+        </pre>
+      </footer>
     </main>
-  )
-}
+  );
+      }
