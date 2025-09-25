@@ -60,13 +60,13 @@ return (
       </button>  
     </div>  
 
-    <div className="card p-5">  
+    {/* <div className="card p-5">  
       <h3 className="font-bold mb-2">محرر الأسعار</h3>  
       <p className="text-white/70 mb-4">تعديل الأسعار فقط</p>  
       <button className="btn inline-block" onClick={() => handleGo('/editor')}>  
         اذهب للمحرر  
       </button>  
-    </div>  
+    </div>   */}
   </section>  
 </main>
 
