@@ -79,7 +79,7 @@ export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: str
       for (const c of data.categories ?? []) {
         const nameAr = c.nameAr ?? ''
         const nameEn = c.nameEn ?? ''
-        const name = c.name ?? nameAr || nameEn
+        const name = c.name ?? (nameAr || nameEn||'')
 
         const ref = await addDoc(catsCol, {
           name,
