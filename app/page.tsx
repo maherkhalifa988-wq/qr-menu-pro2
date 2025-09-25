@@ -14,14 +14,14 @@ export default function Home() {
     try {
       const pass = window.prompt('🛡 أدخل كلمة السر للدخول')?.trim() ?? ''
       if (!pass) return
-
-      await signInWithPasscode(pass) // يسجّل الدخول ويرفع الدور داخليًا
+      await signInWithPasscode(pass)
       router.push(path)
     } catch (err: any) {
       console.error('LOGIN_ERROR', err)
-      alert(`فشل الدخول: ${err?.message ?? err}`)
+      alert(فشل الدخول: ${err?.message ?? err})
     }
   }
+
   return (
     <main className="container mx-auto p-6">
       <header className="mb-8 text-center">
@@ -38,8 +38,7 @@ export default function Home() {
             onChange={(e) => setRid(e.target.value)}
             placeholder="restaurant-id"
           />
-          {/* استخدم template literal داخل الأقواس */}
-          <Link className="btn whitespace-nowrap" href={/r/${encodeURIComponent(rid)}}>
+          <Link className="btn whitespace-nowrap" href={`/r/${encodeURIComponent(rid)}`}>
             فتح القائمة
           </Link>
         </div>
