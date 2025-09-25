@@ -127,7 +127,7 @@ export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: str
         const candidate = it.catId ?? ''
         const byId = createdById.get(candidate)
         const byName = createdByName.get(norm(candidate))
-        const catId = byId  byName  candidate // آخر محاولة: كما هي (لو كانت ID جديد بالفعل)
+        const catId = byId||byName||candidate // آخر محاولة: كما هي (لو كانت ID جديد بالفعل)
         await addDoc(itemsCol, {
           catId,
           name: it.name ?? it.nameAr ?? it.nameEn ?? '',
