@@ -133,111 +133,111 @@ export default function AdminBrandSection({ rid }: Props) {
   }
 
   // استيراد ملف JSON واستبدال البيانات
-async function onImportJSON(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  setImportingJSON(true)
+// async function onImportJSON(e: React.ChangeEvent<HTMLInputElement>) {
+//   const file = e.target.files?.[0]
+//   if (!file) return
+//   setImportingJSON(true)
 
-  try {
-    const text = await file.text()
-    const parsed = JSON.parse(text) as {
-      name?: string
-      categories?: Array<{
-        name?: string
-        nameAr?: string
-        nameEn?: string
-        order?: number
-        imageUrl?: string
-        items?: Array<{
-          name?: string
-          nameAr?: string
-          nameEn?: string
-          price?: number
-          imageUrl?: string
-          order?: number
-        }>
-      }>
-    }
+//   try {
+//     const text = await file.text()
+//     const parsed = JSON.parse(text) as {
+//       name?: string
+//       categories?: Array<{
+//         name?: string
+//         nameAr?: string
+//         nameEn?: string
+//         order?: number
+//         imageUrl?: string
+//         items?: Array<{
+//           name?: string
+//           nameAr?: string
+//           nameEn?: string
+//           price?: number
+//           imageUrl?: string
+//           order?: number
+//         }>
+//       }>
+//     }
 
-    // تحقق سريع
-    const incomingName = parsed?.name ?? ''
-    const categories   = Array.isArray(parsed?.categories) ? parsed.categories : []
+//     // تحقق سريع
+//     const incomingName = parsed?.name ?? ''
+//     const categories   = Array.isArray(parsed?.categories) ? parsed.categories : []
 
-    // 1) حدّث اسم المطعم لو موجود
-    if (incomingName) {
-      await updateDoc(doc(db, 'restaurants', rid), {
-        name: incomingName,
-        updatedAt: Date.now(),
-      })
-      setName(incomingName)
-    }
+//     // 1) حدّث اسم المطعم لو موجود
+//     if (incomingName) {
+//       await updateDoc(doc(db, 'restaurants', rid), {
+//         name: incomingName,
+//         updatedAt: Date.now(),
+//       })
+//       setName(incomingName)
+//     }
 
-    // 2) احذف المجموعات القديمة + عناصرها + العناصر الجذرية
-    const catsCol  = collection(db, 'restaurants', rid, 'categories')
-    const rootItemsCol = collection(db, 'restaurants', rid, 'items')
+//     // 2) احذف المجموعات القديمة + عناصرها + العناصر الجذرية
+//     const catsCol  = collection(db, 'restaurants', rid, 'categories')
+//     const rootItemsCol = collection(db, 'restaurants', rid, 'items')
 
-    // احذف العناصر الجذرية
-    {
-      const rootSnap = await getDocs(rootItemsCol)
-      const batch = writeBatch(db)
-      rootSnap.forEach(d => batch.delete(d.ref))
-      await batch.commit()
-    }
-    // احذف المجموعات وعناصرها
-    {
-      const snap = await getDocs(catsCol)
-      const batch = writeBatch(db)
-      for (const c of snap.docs) {
-        const itemsCol = collection(db, 'restaurants', rid, 'categories', c.id, 'items')
-        const itemsSnap = await getDocs(itemsCol)
-        itemsSnap.forEach((it) => batch.delete(it.ref))
-        batch.delete(c.ref)
-      }
-      await batch.commit()
-    }
+//     // احذف العناصر الجذرية
+//     {
+//       const rootSnap = await getDocs(rootItemsCol)
+//       const batch = writeBatch(db)
+//       rootSnap.forEach(d => batch.delete(d.ref))
+//       await batch.commit()
+//     }
+//     // احذف المجموعات وعناصرها
+//     {
+//       const snap = await getDocs(catsCol)
+//       const batch = writeBatch(db)
+//       for (const c of snap.docs) {
+//         const itemsCol = collection(db, 'restaurants', rid, 'categories', c.id, 'items')
+//         const itemsSnap = await getDocs(itemsCol)
+//         itemsSnap.forEach((it) => batch.delete(it.ref))
+//         batch.delete(c.ref)
+//       }
+//       await batch.commit()
+//     }
 
-    // 3) أضف الجديد
-    for (const cat of categories) {
-      const catRef = await addDoc(catsCol, {
-        name: (cat?.nameAr||cat?.nameEn||cat?.name || ''),
-        nameAr: cat?.nameAr || '',
-        nameEn: cat?.nameEn || '',
-        order: typeof cat?.order === 'number' ? cat.order : 0,
-        imageUrl: cat?.imageUrl || '',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })
+//     // 3) أضف الجديد
+//     for (const cat of categories) {
+//       const catRef = await addDoc(catsCol, {
+//         name: (cat?.nameAr||cat?.nameEn||cat?.name || ''),
+//         nameAr: cat?.nameAr || '',
+//         nameEn: cat?.nameEn || '',
+//         order: typeof cat?.order === 'number' ? cat.order : 0,
+//         imageUrl: cat?.imageUrl || '',
+//         createdAt: Date.now(),
+//         updatedAt: Date.now(),
+//       })
 
-      const items = Array.isArray(cat?.items) ? cat.items : []
-      for (const item of items) {
-        const payload = {
-          name: (item?.nameAr||item?.nameEn||item?.name || ''),
-          nameAr: item?.nameAr || '',
-          nameEn: item?.nameEn || '',
-          price: typeof item?.price === 'number' ? item.price : 0,
-          imageUrl: item?.imageUrl || '',
-          order: typeof item?.order === 'number' ? item.order : 0,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        }
+//       const items = Array.isArray(cat?.items) ? cat.items : []
+//       for (const item of items) {
+//         const payload = {
+//           name: (item?.nameAr||item?.nameEn||item?.name || ''),
+//           nameAr: item?.nameAr || '',
+//           nameEn: item?.nameEn || '',
+//           price: typeof item?.price === 'number' ? item.price : 0,
+//           imageUrl: item?.imageUrl || '',
+//           order: typeof item?.order === 'number' ? item.order : 0,
+//           createdAt: Date.now(),
+//           updatedAt: Date.now(),
+//         }
 
-        // أ) أضف في subcollection تحت المجموعة (لوحة الإدارة تعتمد عليه)
-        await addDoc(collection(db, 'restaurants', rid, 'categories', catRef.id, 'items'), payload)
+//         // أ) أضف في subcollection تحت المجموعة (لوحة الإدارة تعتمد عليه)
+//         await addDoc(collection(db, 'restaurants', rid, 'categories', catRef.id, 'items'), payload)
 
-        // ب) أضف أيضًا نسخة في الجذر مع catId (واجهة الزبون تقرأ من هنا)
-        await addDoc(rootItemsCol, { ...payload, catId: catRef.id })
-      }
-    }
+//         // ب) أضف أيضًا نسخة في الجذر مع catId (واجهة الزبون تقرأ من هنا)
+//         await addDoc(rootItemsCol, { ...payload, catId: catRef.id })
+//       }
+//     }
 
-    alert('✅ تم استيراد ملف JSON واستبدال البيانات بنجاح')
-  } catch (err: any) {
-    console.error(err)
-    alert(`❌ فشل استيراد JSON: ${err?.message ?? err}`)
-  } finally {
-    setImportingJSON(false)
-    e.target.value = ''
-  }
-}
+//     alert('✅ تم استيراد ملف JSON واستبدال البيانات بنجاح')
+//   } catch (err: any) {
+//     console.error(err)
+//     alert(`❌ فشل استيراد JSON: ${err?.message ?? err}`)
+//   } finally {
+//     setImportingJSON(false)
+//     e.target.value = ''
+//   }
+// }
   if (loading) {
     return (
       <section className="card p-5 my-6">
