@@ -140,7 +140,7 @@ export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: str
         const candidate = it.catId ?? ''            // قد يكون id قديم أو اسم
         const byId   = createdById.get(candidate)
         const byName = createdByName.get(norm(candidate))
-        const catId  = byId  byName  candidate  // آخر حل: اتركه كما هو لو هو ID صحيح
+        const catId  = byId||byName||candidate  // آخر حل: اتركه كما هو لو هو ID صحيح
 
         await addDoc(itemsCol, {
           catId,
