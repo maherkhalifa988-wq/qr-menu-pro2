@@ -7,7 +7,7 @@ import { signInWithPasscode } from '@/lib/authClient'
 import AdminBrandSection from './AdminBrandSection'
 import AdminCategoriesManager from './AdminCategoriesManager'
 import AdminItemsManager from './AdminItemsManager'
-import ImportFromJsonButton from './ImportFromJsonButton'
+//import ImportFromJsonButton from './ImportFromJsonButton'
 
 export default function AdminPage() {
   const [role, setRole] = useState<'admin' | 'editor' | null>(null)
