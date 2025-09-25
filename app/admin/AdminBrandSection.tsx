@@ -211,7 +211,7 @@ async function onImportJSON(e: React.ChangeEvent<HTMLInputElement>) {
       const items = Array.isArray(cat?.items) ? cat.items : []
       for (const item of items) {
         const payload = {
-          name: (item?.nameAr  item?.nameEn  item?.name || ''),
+          name: (item?.nameAr||item?.nameEn||item?.name || ''),
           nameAr: item?.nameAr || '',
           nameEn: item?.nameEn || '',
           price: typeof item?.price === 'number' ? item.price : 0,
