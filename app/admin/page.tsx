@@ -16,6 +16,7 @@ import {
 import { db } from '@/lib/firebase'
 import AdminBrandSection from './AdminBrandSection'
 import ImportFromJsonButton from './ImportFromJsonButton'
+import uploadImage from '@/lib/uploadImage'
 
 const RID = 'al-nakheel'
 
@@ -38,12 +39,10 @@ type Item = {
 }
 
 export default function AdminPage() {
-  // حالات الهوية لتمريرها إلى AdminBrandSection
   const [name, setName] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | undefined>()
   const [bgUrl, setBgUrl] = useState<string | undefined>()
 
-  // المجموعات/الأصناف
   const [loadingCats, setLoadingCats] = useState(true)
   const [cats, setCats] = useState<Cat[]>([])
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
@@ -144,7 +143,16 @@ export default function AdminPage() {
     } finally { setSaving(false) }
   }
 
-  // ======= واجهة الصفحة =======
+  // رفع صورة للمجموعة
+  async function handleUploadCatImage(file: File, catId: string) {
+    try {
+      const url = await uploadImage(file, 'categories')
+      setCats(prev => prev.map(c => (c.id === catId ? { ...c, imageUrl: url } : c)))
+    } catch (e: any) {
+      alert('فشل رفع الصورة: ' + (e?.message || e))
+    }
+  }
+
   return (
     <main className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">لوحة الإدارة</h1>
@@ -212,26 +220,26 @@ export default function AdminPage() {
                       setCats(prev => prev.map(x => (x.id === c.id ? { ...x, nameEn: e.target.value } : x)))
                     }
                   />
-                  <label className="text-sm">رابط صورة المجموعة</label>
-                  <input
-                    className="input"
-                    placeholder="ألصق رابط Cloudinary"
-                    value={c.imageUrl ?? ''}
-                    onChange={(e) =>
-                      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, imageUrl: e.target.value } : x)))
-                    }
-                  />
-                  <div className="flex items-center">
-                    {c.imageUrl ? (
+
+                  {/* زر رفع صورة */}
+                  <label className="text-sm">صورة المجموعة</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleUploadCatImage(f, c.id)
+                      }}
+                    />
+                    {c.imageUrl && (
                       <Image
                         src={c.imageUrl}
-                        alt=""
+                        alt="صورة المجموعة"
                         width={80}
                         height={60}
                         className="rounded border border-white/10 object-cover"
                       />
-                    ) : (
-                      <span className="text-white/40 text-xs">لا توجد صورة</span>
                     )}
                   </div>
 
