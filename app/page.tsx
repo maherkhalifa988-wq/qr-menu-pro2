@@ -12,14 +12,14 @@ export default function Home() {
 
   async function handleGo(path: string) {
     try {
-      const pass = window.prompt('🛡️ أدخل كلمة السر للدخول')?.trim() || ''
+      const pass = window.prompt('🛡 أدخل كلمة السر للدخول')?.trim() ?? ''
       if (!pass) return
 
       await signInWithPasscode(pass) // يسجّل الدخول ويرفع الدور داخليًا
       router.push(path)
     } catch (err: any) {
       console.error('LOGIN_ERROR', err)
-      alert('فشل الدخول: ${err?.message || err}')
+      alert(`فشل الدخول: ${err?.message ?? err}`)
     }
   }
 
@@ -39,10 +39,10 @@ export default function Home() {
             onChange={(e) => setRid(e.target.value)}
             placeholder="restaurant-id"
           />
-          {/* ملاحظة: يجب استخدام Template Literal داخل {} */}
-      <Link className="btn whitespace-nowrap" href={'/r/${encodeURIComponent(rid)}'}>
-  فتح القائمة
-</Link>
+          {/* استخدم template literal داخل الأقواس */}
+          <Link className="btn whitespace-nowrap" href={/r/${encodeURIComponent(rid)}}>
+            فتح القائمة
+          </Link>
         </div>
         <p className="text-sm text-white/60 mt-2">
           اجعل رمز QR يشير إلى:{' '}
