@@ -1,58 +1,45 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import { db } from '@/lib/firebase'
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc } from 'firebase/firestore'
 
-// ⚡ AdminBrandSection = الهوية فقط (اسم + شعار + خلفية)
-export default function AdminBrandSection({ rid }: { rid: string }) {
-  const [loading, setLoading] = useState(true)
+const isValidUrl = (u?: string) =>
+  typeof u === 'string' && /^https?:\/\//i.test(u.trim())
+
+export default function AdminBrandSection({
+  rid,
+  name,
+  setName,
+  logoUrl,
+  setLogoUrl,
+  bgUrl,
+  setBgUrl,
+}: {
+  rid: string
+  name: string
+  setName: (v: string) => void
+  logoUrl?: string
+  setLogoUrl: (v: string) => void
+  bgUrl?: string
+  setBgUrl: (v: string) => void
+}) {
   const [savingName, setSavingName] = useState(false)
   const [savingLogo, setSavingLogo] = useState(false)
   const [savingBg, setSavingBg] = useState(false)
 
-  const [name, setName] = useState('')
-  const [logoUrl, setLogoUrl] = useState<string>('')
-  const [bgUrl, setBgUrl] = useState<string>('')
-
-  // تحميل بيانات المطعم
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const ref = doc(db, 'restaurants', rid)
-        const snap = await getDoc(ref)
-        if (!mounted) return
-
-        if (snap.exists()) {
-          const data = snap.data() as any
-          setName(data.name ?? '')
-          setLogoUrl(data.logoUrl ?? '')
-          setBgUrl(data.bgUrl ?? '')
-        } else {
-          await setDoc(
-            ref,
-            { name: '', logoUrl: '', bgUrl: '', updatedAt: Date.now() },
-            { merge: true }
-          )
-        }
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-
-    return () => {
-      mounted = false
-    }
-  }, [rid])
-
-  // حفظ الاسم
   async function saveName() {
     setSavingName(true)
     try {
-      await updateDoc(doc(db, 'restaurants', rid), { name, updatedAt: Date.now() })
-      alert('تم حفظ الاسم ✅')
+      await updateDoc(doc(db, 'restaurants', rid), {
+        name,
+        updatedAt: Date.now(),
+      })
+      alert('✅ تم حفظ الاسم')
+    } catch (err: any) {
+      console.error(err)
+      alert('❌ فشل الحفظ: ' + (err.message || 'خطأ غير معروف'))
     } finally {
       setSavingName(false)
     }
@@ -60,60 +47,36 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
 
   // رفع الشعار
   async function onUploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
+    const file = e.target.files?.[0]
+    if (!file) return
     setSavingLogo(true)
     try {
-      const fd = new FormData()
-      fd.append('file', f)
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'فشل رفع الشعار')
-
-      const url = data.url
+      const url = URL.createObjectURL(file) // هنا مؤقتاً، غيّره لرفع Cloudinary عندك
+      await updateDoc(doc(db, 'restaurants', rid), {
+        logoUrl: url,
+        updatedAt: Date.now(),
+      })
       setLogoUrl(url)
-      await updateDoc(doc(db, 'restaurants', rid), { logoUrl: url, updatedAt: Date.now() })
-      alert('✅ تم رفع الشعار وحفظه')
-    } catch (err: any) {
-      console.error(err)
-      alert('❌ فشل رفع الشعار: ' + (err?.message ?? err))
     } finally {
       setSavingLogo(false)
-      e.target.value = ''
     }
   }
 
   // رفع الخلفية
   async function onUploadBg(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
+    const file = e.target.files?.[0]
+    if (!file) return
     setSavingBg(true)
     try {
-      const fd = new FormData()
-      fd.append('file', f)
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'فشل رفع الخلفية')
-
-      const url = data.url
+      const url = URL.createObjectURL(file) // هنا مؤقتاً، غيّره لرفع Cloudinary عندك
+      await updateDoc(doc(db, 'restaurants', rid), {
+        bgUrl: url,
+        updatedAt: Date.now(),
+      })
       setBgUrl(url)
-      await updateDoc(doc(db, 'restaurants', rid), { bgUrl: url, updatedAt: Date.now() })
-      alert('✅ تم رفع الخلفية وحفظها')
-    } catch (err: any) {
-      console.error(err)
-      alert('❌ فشل رفع الخلفية: ' + (err?.message ?? err))
     } finally {
       setSavingBg(false)
-      e.target.value = ''
     }
-  }
-
-  if (loading) {
-    return (
-      <section className="card p-5 my-6">
-        <div className="text-white/70">...جارِ تحميل بيانات المطعم</div>
-      </section>
-    )
   }
 
   return (
@@ -137,6 +100,7 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
           </button>
         </div>
       </div>
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* الشعار */}
         <div>
@@ -145,14 +109,15 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
             <input type="file" accept="image/*" onChange={onUploadLogo} disabled={savingLogo} />
             {savingLogo && <span className="text-white/70 text-sm">...جارٍ الرفع</span>}
           </div>
-          {logoUrl ? (
+          {isValidUrl(logoUrl) ? (
             <div className="mt-3">
               <Image
-                src={logoUrl}
+                src={logoUrl!}
                 alt="Logo"
                 width={160}
                 height={160}
-                className="rounded-xl border border-white/10"
+                className="rounded-xl border border-white/10 object-cover"
+                unoptimized
               />
             </div>
           ) : (
@@ -166,15 +131,16 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
           <div className="flex items-center gap-3">
             <input type="file" accept="image/*" onChange={onUploadBg} disabled={savingBg} />
             {savingBg && <span className="text-white/70 text-sm">...جارٍ الرفع</span>}
-          </div>
-          {bgUrl ? (
+            </div>
+          {isValidUrl(bgUrl) ? (
             <div className="mt-3">
               <Image
-                src={bgUrl}
+                src={bgUrl!}
                 alt="Background"
                 width={500}
                 height={280}
                 className="rounded-xl border border-white/10 object-cover"
+                unoptimized
               />
             </div>
           ) : (
