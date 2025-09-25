@@ -12,7 +12,7 @@ const router = useRouter()
 
 async function handleGo(path: string) {
 try {
-const pass = window.prompt('🛡 أدخل كلمة السر للدخول')?.trim()  ''
+const pass = window.prompt('🛡 أدخل كلمة السر للدخول')?.trim()??''
 if (!pass) return
 
 await signInWithPasscode(pass) // يسجّل الدخول ويرفع الدور داخليًا  
