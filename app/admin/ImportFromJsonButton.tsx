@@ -104,7 +104,7 @@ export default function ImportFromJsonButton({ rid = 'al-nakheel' }: { rid?: str
         // اربط الـ id القديم بالـ id الجديد
         if (c.id) createdById.set(c.id, ref.id)
         // اربط الاسم الموحّد بالـ id الجديد (كما لو أن catId في الأصناف قد يأتي كاسم)
-        createdByName.set(norm(nameAr)  norm(name)  norm(nameEn), ref.id)
+        createdByName.set(norm(nameAr)||norm(name)||norm(nameEn), ref.id)
 
         // دعم items داخل المجموعة نفسها (سلاسل أو كائنات)
         const embedded = Array.isArray(c.items) ? c.items : []
