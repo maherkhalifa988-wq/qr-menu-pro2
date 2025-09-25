@@ -1,4 +1,135 @@
-// حفظ سعر عنصر واحد
+// app/admin/page.tsx
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  doc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import AdminBrandSection from './AdminBrandSection'
+import ImportFromJsonButton from './ImportFromJsonButton'
+
+const RID = 'al-nakheel'
+
+type Cat = {
+  id: string
+  name?: string
+  nameAr?: string
+  nameEn?: string
+  imageUrl?: string
+  order?: number
+}
+type Item = {
+  id: string
+  name?: string
+  nameAr?: string
+  nameEn?: string
+  price?: number
+  imageUrl?: string
+  order?: number
+}
+
+export default function AdminPage() {
+  // حالات الهوية لتمريرها إلى AdminBrandSection
+  const [name, setName] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | undefined>()
+  const [bgUrl, setBgUrl] = useState<string | undefined>()
+
+  // المجموعات/الأصناف
+  const [loadingCats, setLoadingCats] = useState(true)
+  const [cats, setCats] = useState<Cat[]>([])
+  const [selectedCat, setSelectedCat] = useState<string | null>(null)
+
+  const [loadingItems, setLoadingItems] = useState(false)
+  const [items, setItems] = useState<Item[]>([])
+  const [saving, setSaving] = useState(false)
+
+  // تحميل المجموعات
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        setLoadingCats(true)
+        const qc = query(
+          collection(db, 'restaurants', RID, 'categories'),
+          orderBy('order', 'asc')
+        )
+        const snap = await getDocs(qc)
+        if (!alive) return
+        setCats(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+      } finally {
+        if (alive) setLoadingCats(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // أصناف المجموعة المختارة
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!selectedCat) { setItems([]); return }
+      setLoadingItems(true)
+      try {
+        const col = collection(db, 'restaurants', RID, 'categories', selectedCat, 'items')
+        const snap = await getDocs(col)
+        if (!alive) return
+        setItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+      } finally {
+        if (alive) setLoadingItems(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [selectedCat])
+
+  const currentCat = useMemo(
+    () => cats.find(c => c.id === selectedCat) || null,
+    [cats, selectedCat]
+  )
+
+  async function saveCat(c: Cat) {
+    setSaving(true)
+    try {
+      await updateDoc(doc(db, 'restaurants', RID, 'categories', c.id), {
+        name: c.name ?? c.nameAr ?? c.nameEn ?? '',
+        nameAr: c.nameAr ?? '',
+        nameEn: c.nameEn ?? '',
+        imageUrl: c.imageUrl ?? '',
+        order: typeof c.order === 'number' ? c.order : 0,
+      })
+      setCats(prev => prev.map(x => (x.id === c.id ? { ...x, ...c } : x)))
+      alert('تم حفظ بيانات المجموعة')
+    } catch (e: any) {
+      console.error(e); alert('فشل حفظ المجموعة: ' + (e?.message || ''))
+    } finally { setSaving(false) }
+  }
+
+  async function deleteCat(catId: string) {
+    if (!confirm('سيتم حذف المجموعة وجميع أصنافها. هل أنت متأكد؟')) return
+    setSaving(true)
+    try {
+      const itemsCol = collection(db, 'restaurants', RID, 'categories', catId, 'items')
+      const itemsSnap = await getDocs(itemsCol)
+      const batch = writeBatch(db)
+      itemsSnap.forEach(d => batch.delete(d.ref))
+      batch.delete(doc(db, 'restaurants', RID, 'categories', catId))
+      await batch.commit()
+      setCats(prev => prev.filter(c => c.id !== catId))
+      if (selectedCat === catId) { setSelectedCat(null); setItems([]) }
+      alert('تم الحذف')
+    } catch (e: any) {
+      console.error(e); alert('فشل الحذف: ' + (e?.message || ''))
+    } finally { setSaving(false) }
+  }
+
   async function saveItemPrice(itemId: string, newPrice: number) {
     if (!selectedCat) return
     setSaving(true)
@@ -9,18 +140,16 @@
       )
       setItems(prev => prev.map(it => (it.id === itemId ? { ...it, price: newPrice } : it)))
     } catch (e: any) {
-      console.error(e)
-      alert('فشل حفظ السعر: ' + (e?.message || ''))
-    } finally {
-      setSaving(false)
-    }
+      console.error(e); alert('فشل حفظ السعر: ' + (e?.message || ''))
+    } finally { setSaving(false) }
   }
 
+  // ======= واجهة الصفحة =======
   return (
     <main className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">لوحة الإدارة</h1>
 
-      {/* 1) الهوية (اسم/شعار/خلفية) */}
+      {/* 1) الهوية */}
       <AdminBrandSection
         rid={RID}
         name={name}
@@ -85,7 +214,7 @@
                   />
                   <label className="text-sm">رابط صورة المجموعة</label>
                   <input
-                    className="input col-span-1 md:col-span-1"
+                    className="input"
                     placeholder="ألصق رابط Cloudinary"
                     value={c.imageUrl ?? ''}
                     onChange={(e) =>
@@ -105,6 +234,7 @@
                       <span className="text-white/40 text-xs">لا توجد صورة</span>
                     )}
                   </div>
+
                   <label className="text-sm">الترتيب</label>
                   <input
                     type="number"
@@ -142,7 +272,7 @@
           >
             <option value="">— اختر مجموعة —</option>
             {cats.map(c => (
-              <option key={c.id} value={c.id}>{c.nameAr||c.name||c.nameEn || c.id}</option>
+              <option key={c.id} value={c.id}>{c.nameAr || c.name || c.nameEn || c.id}</option>
             ))}
           </select>
         </div>
@@ -166,7 +296,7 @@
             <tbody>
               {items.map(it => (
                 <tr key={it.id} className="border-t border-white/10">
-                  <td className="p-2">{it.nameAr  it.name  '-'}</td>
+                  <td className="p-2">{it.nameAr || it.name || '-'}</td>
                   <td className="p-2">{it.nameEn || '-'}</td>
                   <td className="p-2">
                     <input
