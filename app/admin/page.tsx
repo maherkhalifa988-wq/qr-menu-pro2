@@ -268,4 +268,4 @@ export default function AdminMenuPage() {
       </footer>
     </main>
   );
-      }
+}
