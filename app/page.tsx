@@ -18,7 +18,7 @@ export default function Home() {
       router.push(path)
     } catch (err: any) {
       console.error('LOGIN_ERROR', err)
-      alert(فشل الدخول: ${err?.message ?? err})
+      alert(`فشل الدخول: ${err?.message ?? err}`)
     }
   }
 
