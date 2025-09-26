@@ -1,10 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { db } from '@/lib/firebase'
-import {
-  collection, doc, getDoc, getDocs, orderBy, query
-} from 'firebase/firestore'
 
 type Cat = {
   id: string
@@ -27,9 +23,7 @@ type Item = {
 
 const asText = (v: any): string => {
   if (typeof v === 'string') return v
-  if (v && typeof v === 'object') {
-    return v.ar ?? v.en ?? v.nameAr ?? v.nameEn ?? ''
-  }
+  if (v && typeof v === 'object') return v.ar ?? v.en ?? v.nameAr ?? v.nameEn ?? ''
   return v == null ? '' : String(v)
 }
 
@@ -61,35 +55,23 @@ export default function RestaurantPublicPage() {
     ;(async () => {
       try {
         setErrMsg(null)
-        const rref = doc(db, 'restaurants', rid)
-        const rsnap = await getDoc(rref)
-        if (!mounted) return
-        if (!rsnap.exists()) {
-          setErrMsg(`لم يتم العثور على المطعم بالمعرف: ${rid} — تأكد أن الرابط هو /r/<معرّف_مطعم> مثل /r/al-nakheel`)
-          setLoading(false)
-          return
+        const res = await fetch(`/api/menu?rid=${encodeURIComponent(rid)}`, { cache: 'no-store' })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          throw new Error(j?.error || `status_${res.status}`)
         }
-        const r = rsnap.data() as any
-        setName(asText(r?.name) || '')
-        setLogoUrl(typeof r?.logoUrl === 'string' ? r.logoUrl : undefined)
-        setBgUrl(typeof r?.bgUrl === 'string' ? r.bgUrl : undefined)
-
-        const qc = query(
-          collection(db, 'restaurants', rid, 'categories'),
-          orderBy('order', 'asc')
-        )
-        const cs = await getDocs(qc)
+        const data = await res.json()
         if (!mounted) return
-        setCats(cs.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
 
-        const qi = collection(db, 'restaurants', rid, 'items')
-        const is = await getDocs(qi)
-        if (!mounted) return
-        setItemsRoot(is.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+        const r = data.restaurant || {}
+        setName((typeof r.name === 'string' ? r.name : '') || '')
+        setLogoUrl(typeof r.logoUrl === 'string' ? r.logoUrl : undefined)
+        setBgUrl(typeof r.bgUrl === 'string' ? r.bgUrl : undefined)
+
+        setCats(Array.isArray(data.categories) ? data.categories : [])
+        setItemsRoot(Array.isArray(data.itemsRoot) ? data.itemsRoot : [])
       } catch (e: any) {
-        console.error('LOAD_ERROR', e)
-        const code = e?.code || e?.message || String(e)
-        setErrMsg(`تعذر تحميل البيانات (${code}). إذا ظهرت للمستخدمين الآخرين، تحقق من قواعد Firestore وأن الرابط صحيح.`)
+        setErrMsg(`تعذر تحميل البيانات (${e?.message || e})`)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -101,14 +83,16 @@ export default function RestaurantPublicPage() {
     let active = true
     async function loadNested(catId: string) {
       try {
-        const nestedCol = collection(db, 'restaurants', rid, 'categories', catId, 'items')
-        const snap = await getDocs(nestedCol)
+        const res = await fetch(
+          `/api/menu/items?rid=${encodeURIComponent(rid)}&catId=${encodeURIComponent(catId)}`,
+          { cache: 'no-store' }
+        )
+        if (!res.ok) throw new Error(`status_${res.status}`)
+        const { items } = await res.json()
         if (!active) return
-        const nestedItems = snap.docs.map(d => ({ id: d.id, ...(d.data() as any), catId }))
-        setItemsForCat(nestedItems.length ? nestedItems : null)
-      } catch (e:any) {
-        console.error('NESTED_LOAD_ERROR', e)
-        setItemsForCat(null)
+        setItemsForCat(Array.isArray(items) && items.length ? items : null)
+      } catch {
+        if (active) setItemsForCat(null)
       }
     }
     if (rid && selectedCat) {
@@ -124,24 +108,15 @@ export default function RestaurantPublicPage() {
     () => (selectedCat ? itemsRoot.filter(i => i.catId === selectedCat) : []),
     [itemsRoot, selectedCat]
   )
+  const itemsToShow = selectedCat ? (itemsForCat ?? fallbackFiltered) : []
 
-  const itemsToShow = selectedCat
-    ? (itemsForCat ?? fallbackFiltered)
-    : []
-
-  if (loading) {
-    return <main className="container mx-auto p-6">...جارٍ التحميل</main>
-  }
+  if (loading) return <main className="container mx-auto p-6">...جارٍ التحميل</main>
 
   return (
     <>
       {bgUrl && (
         <div className="fixed inset-0 -z-10">
-          <img
-            src={bgUrl}
-            alt=""
-            className="w-full h-full object-cover"
-          />
+          <img src={bgUrl} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40" />
         </div>
       )}
@@ -158,26 +133,12 @@ export default function RestaurantPublicPage() {
             <h1 className="text-2xl font-bold">{name || 'القائمة'}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              className={'btn-ghost ' + (lang === 'ar' ? 'ring-2 ring-white/30' : '')}
-              onClick={() => setLang('ar')}
-            >
-              عربي
-            </button>
-            <button
-              className={'btn-ghost ' + (lang === 'en' ? 'ring-2 ring-white/30' : '')}
-              onClick={() => setLang('en')}
-            >
-              EN
-            </button>
+            <button className={'btn-ghost ' + (lang === 'ar' ? 'ring-2 ring-white/30' : '')} onClick={() => setLang('ar')}>عربي</button>
+            <button className={'btn-ghost ' + (lang === 'en' ? 'ring-2 ring-white/30' : '')} onClick={() => setLang('en')}>EN</button>
             {logoUrl ? (
               <div className="w-[84px] sm:w-[100px] md:w-[120px]">
                 <div className="relative aspect-square rounded-lg border border-white/10 bg-white/10 backdrop-blur overflow-hidden">
-                  <img
-                    src={logoUrl}
-                    alt="Logo"
-                    className="absolute inset-0 w-full h-full object-contain p-2"
-                  />
+                  <img src={logoUrl} alt="Logo" className="absolute inset-0 w-full h-full object-contain p-2" />
                 </div>
               </div>
             ) : null}
@@ -197,15 +158,9 @@ export default function RestaurantPublicPage() {
                 >
                   <div className="relative h-36 w-full bg-white/5">
                     {c.imageUrl ? (
-                      <img
-                        src={c.imageUrl}
-                        alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
+                      <img src={c.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-white/40">
-                        لا توجد صورة
-                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center text-white/40">لا توجد صورة</div>
                     )}
                   </div>
                   <div className="p-4 font-semibold">{labelCat(c)}</div>
@@ -233,9 +188,7 @@ export default function RestaurantPublicPage() {
                   </div>
                 </li>
               ))}
-              {itemsToShow.length === 0 && (
-                <li className="text-white/80">لا توجد أصناف في هذه المجموعة.</li>
-              )}
+              {itemsToShow.length === 0 && <li className="text-white/80">لا توجد أصناف في هذه المجموعة.</li>}
             </ul>
           </>
         )}
