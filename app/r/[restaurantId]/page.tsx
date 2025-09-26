@@ -143,7 +143,7 @@ export default function RestaurantPublicPage() {
 
   return (
     <>
-      {/* خلفية تغطي كامل الصفحة + تعتيم خفيف */}
+  
       {bgUrl && (
         <div className="fixed inset-0 -z-10">
           <img
@@ -156,14 +156,14 @@ export default function RestaurantPublicPage() {
       )}
 
       <main className="container mx-auto p-6 relative z-10">
-        {/* إن وُجد خطأ عرض رسالة واضحة */}
+      
         {errMsg && (
           <div className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
             {errMsg}
           </div>
         )}
 
-        {/* ترويسة شفافة فوق الخلفية */}
+      
         <header className="mb-6 flex items-center justify-between rounded-xl bg-black/30 backdrop-blur p-4 border border-white/10">
           <div className="text-right">
             <h1 className="text-2xl font-bold">{name || 'القائمة'}</h1>
@@ -182,7 +182,6 @@ export default function RestaurantPublicPage() {
               EN
             </button>
 
-            {/* الشعار — إطار مربع متجاوب + object-contain حتى لا يُقص */}
             {logoUrl ? (
               <div className="w-[84px] sm:w-[100px] md:w-[120px]">
                 <div className="relative aspect-square rounded-lg border border-white/10 bg-white/10 backdrop-blur overflow-hidden">
@@ -197,7 +196,7 @@ export default function RestaurantPublicPage() {
           </div>
         </header>
 
-        {/* المجموعات */}
+        
         {!selectedCat && (
           <>
             <h2 className="font-bold mb-3">المجموعات</h2>
@@ -209,7 +208,7 @@ export default function RestaurantPublicPage() {
                   onClick={() => setSelectedCat(c.id)}
                   title="افتح المجموعة"
                 >
-                  {/* (لم نغيّر قياسات الصور هنا بناءً على طلبك) */}
+                  
                   <div className="relative h-36 w-full bg-white/5">
                     {c.imageUrl ? (
                       <img
@@ -230,7 +229,7 @@ export default function RestaurantPublicPage() {
           </>
         )}
 
-        {/* الأصناف */}
+        
         {selectedCat && (
           <>
             <div className="flex items-center justify-between mb-4">
