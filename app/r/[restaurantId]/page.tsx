@@ -42,9 +42,9 @@ export default function RestaurantPublicPage() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
 
   const labelCat = (c: Cat) =>
-    (lang === 'ar' ? (c.nameAr || c.name) : (c.nameEn || c.name)) || 'بدون اسم'
+    (lang === 'ar' ? (c.nameAr||c.name) : (c.nameEn||c.name)) || 'بدون اسم'
   const labelItem = (i: Item) =>
-    (lang === 'ar' ? (i.nameAr || i.name) : (i.nameEn || i.name)) || 'بدون اسم'
+    (lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
 
   // تحميل بيانات المطعم + المجموعات + أصناف الجذر
   useEffect(() => {
@@ -118,7 +118,6 @@ export default function RestaurantPublicPage() {
   if (loading) {
     return <main className="container mx-auto p-6">...جارٍ التحميل</main>
   }
-
   return (
     <>
       {/* خلفية تغطي كامل الصفحة + تعتيم خفيف */}
@@ -216,4 +215,4 @@ export default function RestaurantPublicPage() {
       </main>
     </>
   )
-        }
+                              }
