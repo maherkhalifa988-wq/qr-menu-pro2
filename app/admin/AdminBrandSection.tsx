@@ -137,7 +137,6 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
           </button>
         </div>
       </div>
-
       <div className="grid md:grid-cols-2 gap-6">
         {/* الشعار */}
         <div>
@@ -185,4 +184,4 @@ export default function AdminBrandSection({ rid }: { rid: string }) {
       </div>
     </section>
   )
-        }
+              }
