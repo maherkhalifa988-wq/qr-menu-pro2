@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase'
 import {
   collection, doc, getDoc, getDocs, orderBy, query
 } from 'firebase/firestore'
+
 type Cat = {
   id: string
   name?: string
@@ -24,11 +25,21 @@ type Item = {
   order?: number
 }
 
+// حارس بسيط يمنع كائنات بدل النصوص
+const asText = (v: any): string => {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object') {
+    return v.ar ?? v.en ?? v.nameAr ?? v.nameEn ?? ''
+  }
+  return v == null ? '' : String(v)
+}
+
 export default function RestaurantPublicPage() {
   const params = useParams() as { restaurantId?: string } | null
   const rid = params?.restaurantId ?? ''
 
   const [loading, setLoading] = useState(true)
+  const [errMsg, setErrMsg] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | undefined>()
@@ -41,9 +52,9 @@ export default function RestaurantPublicPage() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
 
   const labelCat = (c: Cat) =>
-    (lang === 'ar' ? (c.nameAr||c.name) : (c.nameEn||c.name)) || 'بدون اسم'
+    asText(lang === 'ar' ? (c.nameAr||c.name) : (c.nameEn||c.name)) || 'بدون اسم'
   const labelItem = (i: Item) =>
-    (lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
+    asText(lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
 
   // تحميل بيانات المطعم + المجموعات + أصناف الجذر
   useEffect(() => {
@@ -51,16 +62,21 @@ export default function RestaurantPublicPage() {
     if (!rid) return
     ;(async () => {
       try {
+        setErrMsg(null)
+
         // المطعم
         const rref = doc(db, 'restaurants', rid)
         const rsnap = await getDoc(rref)
         if (!mounted) return
-        if (rsnap.exists()) {
-          const r = rsnap.data() as any
-          setName(r?.name ?? '')
-          setLogoUrl(r?.logoUrl)
-          setBgUrl(r?.bgUrl)
+        if (!rsnap.exists()) {
+          setErrMsg(`لم يتم العثور على المطعم بالمعرف: ${rid} — تأكد أن الرابط هو /r/<معرّف_مطعم> مثل /r/al-nakheel`)
+          setLoading(false)
+          return
         }
+        const r = rsnap.data() as any
+        setName(asText(r?.name) || '')
+        setLogoUrl(typeof r?.logoUrl === 'string' ? r.logoUrl : undefined)
+        setBgUrl(typeof r?.bgUrl === 'string' ? r.bgUrl : undefined)
 
         // المجموعات مرتبة
         const qc = query(
@@ -76,6 +92,10 @@ export default function RestaurantPublicPage() {
         const is = await getDocs(qi)
         if (!mounted) return
         setItemsRoot(is.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+      } catch (e: any) {
+        console.error('LOAD_ERROR', e)
+        const code = e?.code || e?.message || String(e)
+        setErrMsg(`تعذر تحميل البيانات (${code}). إذا ظهرت للمستخدمين الآخرين، تحقق من قواعد Firestore وأن الرابط صحيح.`)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -87,16 +107,19 @@ export default function RestaurantPublicPage() {
   useEffect(() => {
     let active = true
     async function loadNested(catId: string) {
-      // أصناف تحت: restaurants/{rid}/categories/{catId}/items
-      const nestedCol = collection(db, 'restaurants', rid, 'categories', catId, 'items')
-      const snap = await getDocs(nestedCol)
-      if (!active) return
-      const nestedItems = snap.docs.map(d => ({ id: d.id, ...(d.data() as any), catId }))
-      // إن وُجدت أصناف متداخلة نستخدمها؛ وإلا نتركها null كي نرجع للجذر
-      setItemsForCat(nestedItems.length ? nestedItems : null)
+      try {
+        const nestedCol = collection(db, 'restaurants', rid, 'categories', catId, 'items')
+        const snap = await getDocs(nestedCol)
+        if (!active) return
+        const nestedItems = snap.docs.map(d => ({ id: d.id, ...(d.data() as any), catId }))
+        setItemsForCat(nestedItems.length ? nestedItems : null)
+      } catch (e:any) {
+        console.error('NESTED_LOAD_ERROR', e)
+        setItemsForCat(null)
+      }
     }
     if (rid && selectedCat) {
-      setItemsForCat(null) // تصفير قبل الجلب
+      setItemsForCat(null)
       loadNested(selectedCat)
     } else {
       setItemsForCat(null)
@@ -117,6 +140,7 @@ export default function RestaurantPublicPage() {
   if (loading) {
     return <main className="container mx-auto p-6">...جارٍ التحميل</main>
   }
+
   return (
     <>
       {/* خلفية تغطي كامل الصفحة + تعتيم خفيف */}
@@ -125,13 +149,20 @@ export default function RestaurantPublicPage() {
           <img
             src={bgUrl}
             alt=""
-            className="h-full w-full object-cover"
+            className="w-full h-full object-cover" {/* تغطية مثالية لكل الشاشات */}
           />
           <div className="absolute inset-0 bg-black/40" />
         </div>
       )}
 
       <main className="container mx-auto p-6 relative z-10">
+        {/* إن وُجد خطأ عرض رسالة واضحة */}
+        {errMsg && (
+          <div className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
+            {errMsg}
+          </div>
+        )}
+
         {/* ترويسة شفافة فوق الخلفية */}
         <header className="mb-6 flex items-center justify-between rounded-xl bg-black/30 backdrop-blur p-4 border border-white/10">
           <div className="text-right">
@@ -150,12 +181,18 @@ export default function RestaurantPublicPage() {
             >
               EN
             </button>
+
+            {/* الشعار — إطار مربع متجاوب + object-contain حتى لا يُقص */}
             {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Logo"
-                className="h-12 w-auto rounded-lg border border-white/10 bg-white/10 backdrop-blur"
-              />
+              <div className="w-[84px] sm:w-[100px] md:w-[120px]">
+                <div className="relative aspect-square rounded-lg border border-white/10 bg-white/10 backdrop-blur overflow-hidden">
+                  <img
+                    src={logoUrl}
+                    alt="Logo"
+                    className="absolute inset-0 w-full h-full object-contain p-2"
+                  />
+                </div>
+              </div>
             ) : null}
           </div>
         </header>
@@ -172,11 +209,18 @@ export default function RestaurantPublicPage() {
                   onClick={() => setSelectedCat(c.id)}
                   title="افتح المجموعة"
                 >
+                  {/* (لم نغيّر قياسات الصور هنا بناءً على طلبك) */}
                   <div className="relative h-36 w-full bg-white/5">
                     {c.imageUrl ? (
-                      <img src={c.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <img
+                        src={c.imageUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-white/40">لا توجد صورة</div>
+                      <div className="absolute inset-0 flex items-center justify-center text-white/40">
+                        لا توجد صورة
+                      </div>
                     )}
                   </div>
                   <div className="p-4 font-semibold">{labelCat(c)}</div>
@@ -214,4 +258,4 @@ export default function RestaurantPublicPage() {
       </main>
     </>
   )
-                              }
+      }
