@@ -4,8 +4,6 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  // اختياري لفهم الأخطاء أثناء التشخيص:
-  setLogLevel,
 } from 'firebase/firestore'
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth'
 
@@ -18,23 +16,15 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 }
 
-// لوج تفصيلي مؤقتاً (احذفه لاحقاً)
-if (typeof window !== 'undefined') {
-  setLogLevel('debug')
-  console.log('✅ ProjectId from config:', firebaseConfig.projectId)
-}
-
-// App
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-// Firestore مع auto long-polling لتحسين التوافق الشبكي
+// تفعيل auto long-polling لحل مشاكل الشبكات التي تسبب unavailable
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false,
+  // experimentalForceLongPolling: true, // إن أردت إجبار long-polling (اختياري)
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 })
 
-// Auth
 export const auth = getAuth(app)
 
 if (typeof window !== 'undefined') {
