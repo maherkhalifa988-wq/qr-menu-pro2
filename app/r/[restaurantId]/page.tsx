@@ -143,7 +143,7 @@ export default function RestaurantPublicPage() {
 
   return (
     <>
-  
+      
       {bgUrl && (
         <div className="fixed inset-0 -z-10">
           <img
@@ -156,7 +156,7 @@ export default function RestaurantPublicPage() {
       )}
 
       <main className="container mx-auto p-6 relative z-10">
-      
+       
         {errMsg && (
           <div className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
             {errMsg}
@@ -182,6 +182,7 @@ export default function RestaurantPublicPage() {
               EN
             </button>
 
+            
             {logoUrl ? (
               <div className="w-[84px] sm:w-[100px] md:w-[120px]">
                 <div className="relative aspect-square rounded-lg border border-white/10 bg-white/10 backdrop-blur overflow-hidden">
@@ -196,7 +197,7 @@ export default function RestaurantPublicPage() {
           </div>
         </header>
 
-        
+       
         {!selectedCat && (
           <>
             <h2 className="font-bold mb-3">المجموعات</h2>
@@ -229,7 +230,7 @@ export default function RestaurantPublicPage() {
           </>
         )}
 
-        
+       
         {selectedCat && (
           <>
             <div className="flex items-center justify-between mb-4">
@@ -257,4 +258,4 @@ export default function RestaurantPublicPage() {
       </main>
     </>
   )
-      }
+          }
