@@ -25,7 +25,6 @@ type Item = {
   order?: number
 }
 
-// حارس بسيط يمنع كائنات بدل النصوص
 const asText = (v: any): string => {
   if (typeof v === 'string') return v
   if (v && typeof v === 'object') {
@@ -46,8 +45,8 @@ export default function RestaurantPublicPage() {
   const [bgUrl, setBgUrl] = useState<string | undefined>()
 
   const [cats, setCats] = useState<Cat[]>([])
-  const [itemsRoot, setItemsRoot] = useState<Item[]>([])     // أصناف الجذر
-  const [itemsForCat, setItemsForCat] = useState<Item[]|null>(null) // أصناف المسار المتداخل للمجموعة المختارة
+  const [itemsRoot, setItemsRoot] = useState<Item[]>([])
+  const [itemsForCat, setItemsForCat] = useState<Item[]|null>(null)
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
 
@@ -56,15 +55,12 @@ export default function RestaurantPublicPage() {
   const labelItem = (i: Item) =>
     asText(lang === 'ar' ? (i.nameAr||i.name) : (i.nameEn||i.name)) || 'بدون اسم'
 
-  // تحميل بيانات المطعم + المجموعات + أصناف الجذر
   useEffect(() => {
     let mounted = true
     if (!rid) return
     ;(async () => {
       try {
         setErrMsg(null)
-
-        // المطعم
         const rref = doc(db, 'restaurants', rid)
         const rsnap = await getDoc(rref)
         if (!mounted) return
@@ -78,7 +74,6 @@ export default function RestaurantPublicPage() {
         setLogoUrl(typeof r?.logoUrl === 'string' ? r.logoUrl : undefined)
         setBgUrl(typeof r?.bgUrl === 'string' ? r.bgUrl : undefined)
 
-        // المجموعات مرتبة
         const qc = query(
           collection(db, 'restaurants', rid, 'categories'),
           orderBy('order', 'asc')
@@ -87,7 +82,6 @@ export default function RestaurantPublicPage() {
         if (!mounted) return
         setCats(cs.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
 
-        // أصناف الجذر (لو موجودة)
         const qi = collection(db, 'restaurants', rid, 'items')
         const is = await getDocs(qi)
         if (!mounted) return
@@ -103,7 +97,6 @@ export default function RestaurantPublicPage() {
     return () => { mounted = false }
   }, [rid])
 
-  // عند اختيار مجموعة: حاول جلب أصناف المسار المتداخل لتلك المجموعة
   useEffect(() => {
     let active = true
     async function loadNested(catId: string) {
@@ -127,7 +120,6 @@ export default function RestaurantPublicPage() {
     return () => { active = false }
   }, [rid, selectedCat])
 
-  // لو لم نجد أصناف متداخلة للمجموعة المختارة، نرجع لتصفية أصناف الجذر بـ catId
   const fallbackFiltered = useMemo(
     () => (selectedCat ? itemsRoot.filter(i => i.catId === selectedCat) : []),
     [itemsRoot, selectedCat]
@@ -143,27 +135,24 @@ export default function RestaurantPublicPage() {
 
   return (
     <>
-      
       {bgUrl && (
         <div className="fixed inset-0 -z-10">
           <img
             src={bgUrl}
             alt=""
-            className="w-full h-full object-cover" {/* تغطية مثالية لكل الشاشات */}
+            className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40" />
         </div>
       )}
 
       <main className="container mx-auto p-6 relative z-10">
-       
         {errMsg && (
           <div className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
             {errMsg}
           </div>
         )}
 
-      
         <header className="mb-6 flex items-center justify-between rounded-xl bg-black/30 backdrop-blur p-4 border border-white/10">
           <div className="text-right">
             <h1 className="text-2xl font-bold">{name || 'القائمة'}</h1>
@@ -181,8 +170,6 @@ export default function RestaurantPublicPage() {
             >
               EN
             </button>
-
-            
             {logoUrl ? (
               <div className="w-[84px] sm:w-[100px] md:w-[120px]">
                 <div className="relative aspect-square rounded-lg border border-white/10 bg-white/10 backdrop-blur overflow-hidden">
@@ -197,7 +184,6 @@ export default function RestaurantPublicPage() {
           </div>
         </header>
 
-       
         {!selectedCat && (
           <>
             <h2 className="font-bold mb-3">المجموعات</h2>
@@ -209,7 +195,6 @@ export default function RestaurantPublicPage() {
                   onClick={() => setSelectedCat(c.id)}
                   title="افتح المجموعة"
                 >
-                  
                   <div className="relative h-36 w-full bg-white/5">
                     {c.imageUrl ? (
                       <img
@@ -230,7 +215,6 @@ export default function RestaurantPublicPage() {
           </>
         )}
 
-       
         {selectedCat && (
           <>
             <div className="flex items-center justify-between mb-4">
@@ -258,4 +242,4 @@ export default function RestaurantPublicPage() {
       </main>
     </>
   )
-          }
+}
