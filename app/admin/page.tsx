@@ -57,8 +57,8 @@ let mounted = true;
 (async () => {
 try {
 if (!rid) return;
-const res = await fetch(/api/brand?rid=${encodeURIComponent(rid)}, {
-cache: 'no-store',
+const res = await fetch(`/api/brand?rid=${encodeURIComponent(rid)}`, {
+  cache: 'no-store',
 });
 if (!res.ok) return;
 const data = await res.json();
