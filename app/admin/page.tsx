@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase';
 import { signInWithPasscode } from '@/lib/authClient';
+import { SafeBoundary } from '@/app/components/SafeBoundary'; // 👈 إضافـة
 
 // استورد أقسام الإدارة التي عندك
 import AdminBrandSection from './AdminBrandSection';
@@ -84,50 +85,52 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="container mx-auto p-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">لوحة الإدارة</h1>
-        <p className="text-white/70">
-          تم تسجيل الدخول كـ <b>admin</b>
-        </p>
-      </header>
+    <SafeBoundary>
+      <main className="container mx-auto p-6">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold">لوحة الإدارة</h1>
+          <p className="text-white/70">
+            تم تسجيل الدخول كـ <b>admin</b>
+          </p>
+        </header>
 
-      {/* اختيار/تغيير معرف المطعم */}
-      <section className="card p-5 mb-4">
-        <label className="label">معرّف المطعم (Restaurant ID)</label>
-        <input
-          className="input max-w-md"
-          value={rid}
-          onChange={(e) => setRid(e.target.value)}
-          placeholder="al-nakheel"
+        {/* اختيار/تغيير معرف المطعم */}
+        <section className="card p-5 mb-4">
+          <label className="label">معرّف المطعم (Restaurant ID)</label>
+          <input
+            className="input max-w-md"
+            value={rid}
+            onChange={(e) => setRid(e.target.value)}
+            placeholder="al-nakheel"
+          />
+        </section>
+
+        {/* الهوية (اسم/شعار/خلفية) — admin فقط */}
+        <AdminBrandSection
+          rid={rid}
+          name={name}
+          setName={setName}
+          logoUrl={logoUrl}
+          setLogoUrl={setLogoUrl}
+          bgUrl={bgUrl}
+          setBgUrl={setBgUrl}
         />
-      </section>
 
-      {/* الهوية (اسم/شعار/خلفية) — admin فقط */}
-      <AdminBrandSection
-        rid={rid}
-        name={name}
-        setName={setName}
-        logoUrl={logoUrl}
-        setLogoUrl={setLogoUrl}
-        bgUrl={bgUrl}
-        setBgUrl={setBgUrl}
-      />
+        {/* استيراد JSON للمجموعات والأصناف */}
+        <section className="my-6">
+          <ImportFromJsonButton rid={rid} />
+        </section>
 
-      {/* استيراد JSON للمجموعات والأصناف */}
-      <section className="my-6">
-        <ImportFromJsonButton rid={rid} />
-      </section>
+        {/* إدارة المجموعات */}
+        <section className="my-6">
+          <AdminCategoriesManager rid={rid} />
+        </section>
 
-      {/* إدارة المجموعات */}
-      <section className="my-6">
-        <AdminCategoriesManager rid={rid} />
-      </section>
-
-      {/* إدارة الأصناف وتشغيل الأسعار */}
-      <section className="my-6">
-        <AdminItemsManager rid={rid} />
-      </section>
-    </main>
+        {/* إدارة الأصناف وتشغيل الأسعار */}
+        <section className="my-6">
+          <AdminItemsManager rid={rid} />
+        </section>
+      </main>
+    </SafeBoundary>
   );
-          }
+}
