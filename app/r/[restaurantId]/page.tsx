@@ -5,10 +5,6 @@ import { db } from '@/lib/firebase'
 import {
   collection, doc, getDoc, getDocs, orderBy, query
 } from 'firebase/firestore'
-import { redirect } from 'next/navigation'
-export default function RestaurantsPage() {
-  redirect('/r/al-nakheel'); // غيّر المعرف إذا لزم
-}
 type Cat = {
   id: string
   name?: string
